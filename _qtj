@@ -1,5 +1,18 @@
-# ============ db.py ============
+import sys
+from PyQt6 import QtWidgets
+from PyQt6.QtGui import QIcon
+from views.login import LoginWindow
+
+if __name__ == '__main__':
+    app = QtWidgets.QApplication(sys.argv)
+    app.setWindowIcon(QIcon("images/Icon.ico"))
+    window = LoginWindow()
+    window.show()
+    sys.exit(app.exec())
+
+
 import pymysql
+
 def get_conn():
     return pymysql.connect(
         host="localhost",
@@ -45,7 +58,7 @@ def get_orders():
     conn.close()
     return orders
 
-# ============ views/login.py ============
+
 import pymysql
 from PyQt6 import QtWidgets, uic
 from PyQt6.QtGui import QPixmap
@@ -114,192 +127,236 @@ class LoginWindow(QtWidgets.QMainWindow):
             return
         self.window.show()
         self.close()
-# ============ views/admin.py ============
-import pymysql
+
+
 from PyQt6 import QtWidgets, uic
 from PyQt6.QtWidgets import QListWidgetItem, QWidget, QLabel, QVBoxLayout, QHBoxLayout
-from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
-from db import get_products, get_conn
+from db import get_orders
 
-class AdminWindow(QtWidgets.QMainWindow):
-    def __init__(self, user_id):
+class OrdersWindow(QtWidgets.QMainWindow):
+    def __init__(self):
         super().__init__()
-        uic.loadUi("forms/admin.ui", self)
-        self.user_id = user_id
-
-        self.inputSearch.textChanged.connect(self.apply_filters)
-        self.comboSupplier.currentTextChanged.connect(self.apply_filters)
-        self.btnSortAsc.clicked.connect(self.sort_asc)
-        self.btnSortDesc.clicked.connect(self.sort_desc)
-        self.btnExit.clicked.connect(self.logout)
-        self.current_article = None
-        self.btnDelete.clicked.connect(self.delete_product)
-        self.btnOrders.clicked.connect(self.open_orders)
-        self.listWidget.currentItemChanged.connect(self.on_item_selected)
-
-        self.load_user_name()
-        self.load_suppliers()
+        uic.loadUi("forms/client.ui", self)
+        self.setWindowTitle("Заказы")
+        self.labelUserName.setVisible(False)
+        self.btnExit.clicked.connect(self.close)
         self.fill_list()
 
-    def load_user_name(self):
-        conn = get_conn()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-        cursor.execute(
-            "select last_name, first_name, patronymic from user where id = %s",
-            (self.user_id,)
-        )
-        user = cursor.fetchone()
-        conn.close()
-        self.labelUserName.setText(
-            f"{user['last_name']} {user['first_name']} {user['patronymic']}"
-        )
-
-    def load_suppliers(self):
-        conn = get_conn()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-        cursor.execute("select name from supplier")
-        suppliers = cursor.fetchall()
-        conn.close()
-        self.comboSupplier.addItem("Все поставщики")
-        for s in suppliers:
-            self.comboSupplier.addItem(s['name'])
-
-    def fill_list(self, products=None):
-        if products is None:
-            products = get_products()
-        self.products_on_screen = products
+    def fill_list(self):
+        orders = get_orders()
         self.listWidget.clear()
-        for p in products:
-            card = self.create_card(p)
+        for o in orders:
+            card = self.create_card(o)
             item = QListWidgetItem()
             item.setSizeHint(card.sizeHint())
             self.listWidget.addItem(item)
             self.listWidget.setItemWidget(item, card)
 
-    def create_card(self, p):
+    def create_card(self, o):
         card = QWidget()
         row = QHBoxLayout(card)
-        row.addWidget(self.make_photo(p))
-        row.addLayout(self.make_info(p))
-        row.addWidget(self.make_discount(p))
-        self.apply_color(card, p)
+
+        info = QVBoxLayout()
+        info.addWidget(QLabel(f"<b>Артикул заказа: {o['code']}</b>"))
+        info.addWidget(QLabel(f"Статус: {o['status']}"))
+        info.addWidget(QLabel(f"Адрес пункта выдачи: {o['pickup_point']}"))
+        info.addWidget(QLabel(f"Дата заказа: {o['date_z']}"))
+        row.addLayout(info)
+
+        date_label = QLabel(f"Дата доставки:\n{o['date_d']}")
+        date_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        date_label.setFixedWidth(120)
+        row.addWidget(date_label)
+
         return card
 
-    def make_photo(self, p):
-        label = QLabel()
-        path = f"images/{p['photo']}" if p['photo'] else "images/picture.png"
-        label.setPixmap(QPixmap(path).scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio))
-        label.setFixedWidth(90)
-        return label
+    import pymysql
+    from PyQt6 import QtWidgets, uic
+    from PyQt6.QtWidgets import QListWidgetItem, QWidget, QLabel, QVBoxLayout, QHBoxLayout
+    from PyQt6.QtGui import QPixmap
+    from PyQt6.QtCore import Qt
+    from db import get_products, get_conn
 
-    def make_discount(self, p):
-        label = QLabel(f"{p['discount']}%")
-        label.setFixedWidth(60)
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        return label
+    class AdminWindow(QtWidgets.QMainWindow):
+        def __init__(self, user_id):
+            super().__init__()
+            uic.loadUi("forms/admin.ui", self)
+            self.user_id = user_id
 
-    def apply_color(self, card, p):
-        if p['discount'] > 15:
-            card.setStyleSheet("QWidget { background-color: #2E8B57; }")
-        elif p['quantity'] == 0:
-            card.setStyleSheet("QWidget { background-color: lightblue; }")
+            self.inputSearch.textChanged.connect(self.apply_filters)
+            self.comboSupplier.currentTextChanged.connect(self.apply_filters)
+            self.btnSortAsc.clicked.connect(self.sort_asc)
+            self.btnSortDesc.clicked.connect(self.sort_desc)
+            self.btnExit.clicked.connect(self.logout)
+            self.current_article = None
+            self.btnDelete.clicked.connect(self.delete_product)
+            self.btnOrders.clicked.connect(self.open_orders)
+            self.listWidget.currentItemChanged.connect(self.on_item_selected)
 
-    def make_info(self, p):
-        info = QVBoxLayout()
-        info.addWidget(QLabel(f"<b>{p['category']} | {p['type']}</b>"))
-        info.addWidget(QLabel(f"Описание: {p['description']}"))
-        info.addWidget(QLabel(f"Производитель: {p['manufacturer']}"))
-        info.addWidget(QLabel(f"Поставщик: {p['supplier']}"))
-        info.addLayout(self.make_price(p))
-        info.addWidget(QLabel(f"Ед.изм.: {p['unit']}"))
-        info.addWidget(QLabel(f"Кол-во: {p['quantity']}"))
-        return info
+            self.load_user_name()
+            self.load_suppliers()
+            self.fill_list()
 
-    def make_price(self, p):
-        price_row = QHBoxLayout()
-        price = p['price']
-        discount = p['discount']
-        if discount > 0:
-            old = QLabel(f"{price} руб.")
-            old.setStyleSheet("text-decoration: line-through; color: red;")
-            price_row.addWidget(old)
-            price_row.addWidget(QLabel(f"{round(price * (1 - discount / 100), 2)} руб."))
-        else:
-            price_row.addWidget(QLabel(f"{price} руб."))
-        return price_row
-
-    def apply_filters(self):
-        products = get_products()
-
-        supplier = self.comboSupplier.currentText()
-        if supplier != "Все поставщики":
-            products = [p for p in products if p['supplier'] == supplier]
-
-        text = self.inputSearch.text().strip().lower()
-        if text:
-            products = [p for p in products if text in
-                        (p['article'] + p['type'] + p['category'] + p['description'] +
-                         p['manufacturer'] + p['supplier']).lower()
-                        ]
-
-        if hasattr(self, 'sort_order'):
-            products.sort(
-                key=lambda p: p['quantity'],
-                reverse=(self.sort_order == 'desc')
+        def load_user_name(self):
+            conn = get_conn()
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            cursor.execute(
+                "select last_name, first_name, patronymic from user where id = %s",
+                (self.user_id,)
+            )
+            user = cursor.fetchone()
+            conn.close()
+            self.labelUserName.setText(
+                f"{user['last_name']} {user['first_name']} {user['patronymic']}"
             )
 
-        self.fill_list(products)
-
-    def sort_asc(self):
-        self.sort_order = 'asc'
-        self.apply_filters()
-
-    def sort_desc(self):
-        self.sort_order = 'desc'
-        self.apply_filters()
-
-    def on_item_selected(self, current, previous):
-        if current is None:
-            self.current_article = None
-            return
-        self.current_article = self.products_on_screen[self.listWidget.row(current)]['article']
-
-    def delete_product(self):
-        if self.current_article is None:
-            QtWidgets.QMessageBox.warning(self, "Ошибка", "Выберите товар для удаления.")
-            return
-        conn = get_conn()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM order_item WHERE article = %s", (self.current_article,))
-        if cursor.fetchone()[0] > 0:
+        def load_suppliers(self):
+            conn = get_conn()
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            cursor.execute("select name from supplier")
+            suppliers = cursor.fetchall()
             conn.close()
-            QtWidgets.QMessageBox.warning(self, "Ошибка", "Нельзя удалить товар, который присутствует в заказе.")
-            return
-        conn.close()
-        reply = QtWidgets.QMessageBox.question(self, "Подтверждение", f"Удалить товар {self.current_article}?",
-                                               QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
-        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
-            return
-        conn = get_conn()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM product WHERE article = %s", (self.current_article,))
-        conn.commit()
-        conn.close()
-        self.current_article = None
-        self.apply_filters()
+            self.comboSupplier.addItem("Все поставщики")
+            for s in suppliers:
+                self.comboSupplier.addItem(s['name'])
 
-    def open_orders(self):
-        from views.orders import OrdersWindow
-        self.orders_window = OrdersWindow()
-        self.orders_window.show()
+        def fill_list(self, products=None):
+            if products is None:
+                products = get_products()
+            self.products_on_screen = products
+            self.listWidget.clear()
+            for p in products:
+                card = self.create_card(p)
+                item = QListWidgetItem()
+                item.setSizeHint(card.sizeHint())
+                self.listWidget.addItem(item)
+                self.listWidget.setItemWidget(item, card)
 
-    def logout(self):
-        from views.login import LoginWindow
-        self.window = LoginWindow()
-        self.window.show()
-        self.close()
-# ============ views/manager.py ============
+        def create_card(self, p):
+            card = QWidget()
+            row = QHBoxLayout(card)
+            row.addWidget(self.make_photo(p))
+            row.addLayout(self.make_info(p))
+            row.addWidget(self.make_discount(p))
+            self.apply_color(card, p)
+            return card
+
+        def make_photo(self, p):
+            label = QLabel()
+            path = f"images/{p['photo']}" if p['photo'] else "images/picture.png"
+            label.setPixmap(QPixmap(path).scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio))
+            label.setFixedWidth(90)
+            return label
+
+        def make_discount(self, p):
+            label = QLabel(f"{p['discount']}%")
+            label.setFixedWidth(60)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            return label
+
+        def apply_color(self, card, p):
+            if p['discount'] > 15:
+                card.setStyleSheet("QWidget { background-color: #2E8B57; }")
+            elif p['quantity'] == 0:
+                card.setStyleSheet("QWidget { background-color: lightblue; }")
+
+        def make_info(self, p):
+            info = QVBoxLayout()
+            info.addWidget(QLabel(f"<b>{p['category']} | {p['type']}</b>"))
+            info.addWidget(QLabel(f"Описание: {p['description']}"))
+            info.addWidget(QLabel(f"Производитель: {p['manufacturer']}"))
+            info.addWidget(QLabel(f"Поставщик: {p['supplier']}"))
+            info.addLayout(self.make_price(p))
+            info.addWidget(QLabel(f"Ед.изм.: {p['unit']}"))
+            info.addWidget(QLabel(f"Кол-во: {p['quantity']}"))
+            return info
+
+        def make_price(self, p):
+            price_row = QHBoxLayout()
+            price = p['price']
+            discount = p['discount']
+            if discount > 0:
+                old = QLabel(f"{price} руб.")
+                old.setStyleSheet("text-decoration: line-through; color: red;")
+                price_row.addWidget(old)
+                price_row.addWidget(QLabel(f"{round(price * (1 - discount / 100), 2)} руб."))
+            else:
+                price_row.addWidget(QLabel(f"{price} руб."))
+            return price_row
+
+        def apply_filters(self):
+            products = get_products()
+
+            supplier = self.comboSupplier.currentText()
+            if supplier != "Все поставщики":
+                products = [p for p in products if p['supplier'] == supplier]
+
+            text = self.inputSearch.text().strip().lower()
+            if text:
+                products = [p for p in products if text in
+                            (p['article'] + p['type'] + p['category'] + p['description'] +
+                             p['manufacturer'] + p['supplier']).lower()
+                            ]
+
+            if hasattr(self, 'sort_order'):
+                products.sort(
+                    key=lambda p: p['quantity'],
+                    reverse=(self.sort_order == 'desc')
+                )
+
+            self.fill_list(products)
+
+        def sort_asc(self):
+            self.sort_order = 'asc'
+            self.apply_filters()
+
+        def sort_desc(self):
+            self.sort_order = 'desc'
+            self.apply_filters()
+
+        def on_item_selected(self, current, _):
+            if current is None:
+                self.current_article = None
+                return
+            self.current_article = self.products_on_screen[self.listWidget.row(current)]['article']
+
+        def delete_product(self):
+            if self.current_article is None:
+                QtWidgets.QMessageBox.warning(self, "Ошибка", "Выберите товар для удаления.")
+                return
+            conn = get_conn()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM order_item WHERE article = %s", (self.current_article,))
+            if cursor.fetchone()[0] > 0:
+                conn.close()
+                QtWidgets.QMessageBox.warning(self, "Ошибка", "Нельзя удалить товар, который присутствует в заказе.")
+                return
+            conn.close()
+            reply = QtWidgets.QMessageBox.question(self, "Подтверждение", f"Удалить товар {self.current_article}?",
+                                                   QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+            conn = get_conn()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM product WHERE article = %s", (self.current_article,))
+            conn.commit()
+            conn.close()
+            self.current_article = None
+            self.apply_filters()
+
+        def open_orders(self):
+            from views.orders import OrdersWindow
+            self.orders_window = OrdersWindow()
+            self.orders_window.show()
+
+        def logout(self):
+            from views.login import LoginWindow
+            self.window = LoginWindow()
+            self.window.show()
+            self.close()
+
+
 import pymysql
 from PyQt6 import QtWidgets, uic
 from PyQt6.QtWidgets import QListWidgetItem, QWidget, QLabel, QVBoxLayout, QHBoxLayout
@@ -453,7 +510,8 @@ class ManagerWindow(QtWidgets.QMainWindow):
         self.window = LoginWindow()
         self.window.show()
         self.close()
-# ============ views/client.py ============
+
+
 import pymysql
 from PyQt6 import QtWidgets, uic
 from PyQt6.QtWidgets import QListWidgetItem, QWidget, QLabel, QVBoxLayout, QHBoxLayout
@@ -554,7 +612,8 @@ class ClientWindow(QtWidgets.QMainWindow):
         self.window = LoginWindow()
         self.window.show()
         self.close()
-# ============ views/guest.py ============
+
+
 from PyQt6 import QtWidgets, uic
 from PyQt6.QtWidgets import QListWidgetItem, QWidget, QLabel, QVBoxLayout, QHBoxLayout
 from PyQt6.QtGui import QPixmap
@@ -639,61 +698,7 @@ class GuestWindow(QtWidgets.QMainWindow):
         self.window = LoginWindow()
         self.window.show()
         self.close()
-# ============ main.py ============
-import sys
-from PyQt6 import QtWidgets
-from PyQt6.QtGui import QIcon
-from views.login import LoginWindow
 
-if __name__ == '__main__':
-    app = QtWidgets.QApplication(sys.argv)
-    app.setWindowIcon(QIcon("images/Icon.ico"))
-    window = LoginWindow()
-    window.show()
-    sys.exit(app.exec())
-# ============ order.py ============
-from PyQt6 import QtWidgets, uic
-from PyQt6.QtWidgets import QListWidgetItem, QWidget, QLabel, QVBoxLayout, QHBoxLayout
-from PyQt6.QtCore import Qt
-from db import get_orders
-
-class OrdersWindow(QtWidgets.QMainWindow):
-    def __init__(self):
-        super().__init__()
-        uic.loadUi("forms/client.ui", self)
-        self.setWindowTitle("Заказы")
-        self.labelUserName.setVisible(False)
-        self.btnExit.clicked.connect(self.close)
-        self.fill_list()
-
-    def fill_list(self):
-        orders = get_orders()
-        self.listWidget.clear()
-        for o in orders:
-            card = self.create_card(o)
-            item = QListWidgetItem()
-            item.setSizeHint(card.sizeHint())
-            self.listWidget.addItem(item)
-            self.listWidget.setItemWidget(item, card)
-
-    def create_card(self, o):
-        card = QWidget()
-        row = QHBoxLayout(card)
-
-        info = QVBoxLayout()
-        info.addWidget(QLabel(f"<b>Артикул заказа: {o['code']}</b>"))
-        info.addWidget(QLabel(f"Статус: {o['status']}"))
-        info.addWidget(QLabel(f"Адрес пункта выдачи: {o['pickup_point']}"))
-        info.addWidget(QLabel(f"Дата заказа: {o['date_z']}"))
-        row.addLayout(info)
-
-        date_label = QLabel(f"Дата доставки:\n{o['date_d']}")
-        date_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        date_label.setFixedWidth(120)
-        row.addWidget(date_label)
-
-        return card
-# ============ login.ui ============
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>mainWindow</class>
@@ -861,7 +866,8 @@ class OrdersWindow(QtWidgets.QMainWindow):
  <resources/>
  <connections/>
 </ui>
-# ============ admin.ui ============
+
+
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>MainWindow</class>
@@ -972,7 +978,8 @@ class OrdersWindow(QtWidgets.QMainWindow):
  <resources/>
  <connections/>
 </ui>
-# ============ client.ui ============
+
+
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>MainWindow</class>
@@ -1062,3 +1069,5 @@ class OrdersWindow(QtWidgets.QMainWindow):
  <resources/>
  <connections/>
 </ui>
+
+
